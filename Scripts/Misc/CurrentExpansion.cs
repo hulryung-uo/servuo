@@ -24,12 +24,17 @@ namespace Server
             
 			TownCryerSystem.Enabled = Core.TOL;
 
-			ObjectPropertyList.Enabled = Core.AOS;
+			ObjectPropertyList.Enabled = true;
 
             Mobile.InsuranceEnabled = Core.AOS && !Siege.SiegeShard;
 			Mobile.VisibleDamageType = Core.AOS ? VisibleDamageType.Related : VisibleDamageType.None;
 			Mobile.GuildClickMessage = !Core.AOS;
 			Mobile.AsciiClickMessage = !Core.AOS;
+
+			if (ObjectPropertyList.Enabled)
+			{
+				PacketHandlers.SingleClickProps = true; // single click for everything is overriden to check object property list
+			}
 
 			if (!Core.AOS)
 			{
@@ -37,11 +42,6 @@ namespace Server
 			}
 
 			AOS.DisableStatInfluences();
-
-			if (ObjectPropertyList.Enabled)
-			{
-				PacketHandlers.SingleClickProps = true; // single click for everything is overriden to check object property list
-			}
 
 			Mobile.ActionDelay = Core.TOL ? 500 : Core.AOS ? 1000 : 500;
 			Mobile.AOSStatusHandler = AOS.GetStatus;
