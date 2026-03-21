@@ -26,6 +26,10 @@ namespace Server
 
 			ObjectPropertyList.Enabled = true;
 
+			// Enable AOS feature flags for client-side OPL tooltips and context menus
+			SupportedFeatures.Value |= FeatureFlags.AOS;
+			CharacterList.AdditionalFlags |= CharacterListFlags.AOS;
+
             Mobile.InsuranceEnabled = Core.AOS && !Siege.SiegeShard;
 			Mobile.VisibleDamageType = Core.AOS ? VisibleDamageType.Related : VisibleDamageType.None;
 			Mobile.GuildClickMessage = !Core.AOS;
