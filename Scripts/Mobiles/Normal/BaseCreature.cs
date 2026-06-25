@@ -431,8 +431,9 @@ namespace Server.Mobiles
         }
 
         #region Bonding
-        // Pet bonding did not exist in T2A; it was introduced in the Renaissance era.
-        public static bool BondingEnabled { get { return Core.UOR; } }
+        // Pet bonding is a post-T2A feature, kept enabled here as a QoL backport
+        // (prevents permanent loss of tamed pets on death).
+        public static bool BondingEnabled { get { return true; } }
 
         public virtual bool IsBondable { get { return (BondingEnabled && !Summoned && !m_Allured && !IsGolem); } }
         public virtual TimeSpan BondingDelay { get { return TimeSpan.FromDays(7.0); } }

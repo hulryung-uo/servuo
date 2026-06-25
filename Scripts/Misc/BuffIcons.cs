@@ -10,7 +10,8 @@ namespace Server
         {
             get
             {
-                return Core.ML;
+                // QoL backport: enable the buff/debuff icon bar on all eras (client-side UI only).
+                return true;
             }
         }
 
