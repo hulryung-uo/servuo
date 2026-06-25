@@ -39,7 +39,9 @@ namespace Server.Mobiles
         }
         public override void InitSBInfo()
         {
-            this.m_SBInfos.Add(new SBMystic());
+            // Mysticism is a Stygian Abyss feature; do not stock its books/scrolls pre-SA.
+            if (Core.SA)
+                this.m_SBInfos.Add(new SBMystic());
         }
 
         public override void InitOutfit()

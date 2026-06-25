@@ -233,6 +233,16 @@ namespace Server.Commands
 
         public static bool CanGenerate(CommandEntry entry, ref string error)
         {
+            if (entry.RequiredExpansion > Core.Expansion)
+            {
+                string er = String.Format("<br>- {0} requires a later expansion than the shard's current era.", entry.Name);
+                Console.WriteLine(er);
+
+                error += er;
+
+                return false;
+            }
+
             if (CreateWorldData.CreateTable.ContainsKey(entry.CheckID) && CreateWorldData.CreateTable[entry.CheckID])
             {
                 string er = String.Format("<br>- {0} have been generated already.", entry.Name);

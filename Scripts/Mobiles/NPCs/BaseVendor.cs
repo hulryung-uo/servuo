@@ -2225,7 +2225,8 @@ namespace Server.Mobiles
 
 				seller.PlaySound(0x0037); //Gold dropping sound
 
-				if (SupportsBulkOrders(seller))
+				// Bulk Order Deeds are a Renaissance-era (post-T2A) feature.
+				if (Core.UOR && SupportsBulkOrders(seller))
 				{
 					Item bulkOrder = CreateBulkOrder(seller, false);
 

@@ -32,12 +32,27 @@ namespace Server.Commands
 
             m_Mobile.SendMessage("Generating world decoration, please wait.");
 
-            Generate("deco", "Data/Decoration/Britannia", Map.Trammel, Map.Felucca);
-		    Generate("deco", "Data/Decoration/Trammel", Map.Trammel);
+            // T2A: Felucca only. Britannia shared deco goes to Felucca; later facets gated by era.
+            if (Core.UOR)
+            {
+                Generate("deco", "Data/Decoration/Britannia", Map.Trammel, Map.Felucca);
+                Generate("deco", "Data/Decoration/Trammel", Map.Trammel);
+            }
+            else
+            {
+                Generate("deco", "Data/Decoration/Britannia", Map.Felucca);
+            }
+
 			Generate("deco", "Data/Decoration/Felucca", Map.Felucca);
-			Generate("deco", "Data/Decoration/Ilshenar", Map.Ilshenar);
-			Generate("deco", "Data/Decoration/Malas", Map.Malas);
-			Generate("deco", "Data/Decoration/Tokuno", Map.Tokuno);
+
+            if (Core.UOTD)
+                Generate("deco", "Data/Decoration/Ilshenar", Map.Ilshenar);
+
+            if (Core.AOS)
+                Generate("deco", "Data/Decoration/Malas", Map.Malas);
+
+            if (Core.SE)
+                Generate("deco", "Data/Decoration/Tokuno", Map.Tokuno);
 
             m_Mobile.SendMessage("World generating complete. {0} items were generated.", m_Count);
         }

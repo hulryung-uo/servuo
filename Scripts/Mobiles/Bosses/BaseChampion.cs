@@ -185,23 +185,28 @@ namespace Server.Mobiles
                 }
             }
 
-            // Randomize - PowerScrolls
-            for (int i = 0; i < toGive.Count; ++i)
+            // Power scrolls are a post-T2A (Renaissance/UOR-era) reward. T2A champions still
+            // award Valor and the gold/loot shower above, but no power scrolls.
+            if (Core.UOR)
             {
-                int rand = Utility.Random(toGive.Count);
-                Mobile hold = toGive[i];
-                toGive[i] = toGive[rand];
-                toGive[rand] = hold;
-            }
+                // Randomize - PowerScrolls
+                for (int i = 0; i < toGive.Count; ++i)
+                {
+                    int rand = Utility.Random(toGive.Count);
+                    Mobile hold = toGive[i];
+                    toGive[i] = toGive[rand];
+                    toGive[rand] = hold;
+                }
 
-            for (int i = 0; i < ChampionSystem.PowerScrollAmount; ++i)
-            {
-                Mobile m = toGive[i % toGive.Count];
+                for (int i = 0; i < ChampionSystem.PowerScrollAmount; ++i)
+                {
+                    Mobile m = toGive[i % toGive.Count];
 
-                PowerScroll ps = CreateRandomPowerScroll();
-                m.SendLocalizedMessage(1049524); // You have received a scroll of power!
+                    PowerScroll ps = CreateRandomPowerScroll();
+                    m.SendLocalizedMessage(1049524); // You have received a scroll of power!
 
-                GivePowerScrollTo(m, ps, this);
+                    GivePowerScrollTo(m, ps, this);
+                }
             }
 
             if (Core.TOL)

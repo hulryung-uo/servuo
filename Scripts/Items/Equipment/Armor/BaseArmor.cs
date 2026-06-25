@@ -3134,7 +3134,9 @@ namespace Server.Items
 
             PlayerConstructed = true;
 
-            if (Quality == ItemQuality.Exceptional && !craftItem.ForceNonExceptional)
+            // Exceptional armor grants AOS elemental resistance bonuses, which did not exist in T2A.
+            // Pre-AOS, exceptional quality only improves armor rating / durability (handled by ArmorRating).
+            if (Core.AOS && Quality == ItemQuality.Exceptional && !craftItem.ForceNonExceptional)
             {
                 DistributeExceptionalBonuses(from, (tool is BaseRunicTool ? 6 : Core.SE ? 15 : 14)); // Not sure since when, but right now 15 points are added, not 14.
             }

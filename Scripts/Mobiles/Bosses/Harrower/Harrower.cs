@@ -306,6 +306,10 @@ namespace Server.Mobiles
 
         public void GivePowerScrolls()
         {
+            // Stat-cap scrolls are a post-T2A (Renaissance/UOR-era) reward.
+            if (!Core.UOR)
+                return;
+
             List<Mobile> toGive = new List<Mobile>();
             List<DamageStore> rights = GetLootingRights();
 

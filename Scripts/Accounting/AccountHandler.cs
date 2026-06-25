@@ -32,7 +32,8 @@ namespace Server.Misc
 
         private static readonly CityInfo[] StartingCitiesT2A = new CityInfo[]
         {
-            new CityInfo("New Haven",	"New Haven Bank",	1150168, 3503,	2574,	14, Map.Felucca),
+            // T2A: classic Magincia (New Haven did not exist until 2008/ML).
+            new CityInfo("Magincia",	"The Great Horns Tavern",	1075077, 3734,	2222,	20, Map.Felucca),
             new CityInfo("Yew", "The Empath Abbey",	1075072, 633,	858,	0, Map.Felucca),
             new CityInfo("Minoc", "The Barnacle", 1075073, 2476,	413,	15, Map.Felucca),
             new CityInfo("Britain",	"The Wayfarer's Inn",	1075074, 1602,	1591,	20, Map.Felucca),

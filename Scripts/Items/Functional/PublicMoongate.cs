@@ -37,16 +37,25 @@ namespace Server.Items
 
 			var count = 0;
 
-			if (!Siege.SiegeShard)
+			// T2A: Felucca-only moongate network. Sister facets are gated by era.
+			if (!Siege.SiegeShard && Core.UOR)
 			{
 				count += MoonGen(PMList.Trammel);
 			}
 
 			count += MoonGen(PMList.Felucca);
-			count += MoonGen(PMList.Ilshenar);
-			count += MoonGen(PMList.Malas);
-			count += MoonGen(PMList.Tokuno);
-			count += MoonGen(PMList.TerMur);
+
+			if (Core.UOTD)
+				count += MoonGen(PMList.Ilshenar);
+
+			if (Core.AOS)
+				count += MoonGen(PMList.Malas);
+
+			if (Core.SE)
+				count += MoonGen(PMList.Tokuno);
+
+			if (Core.SA)
+				count += MoonGen(PMList.TerMur);
 
 			World.Broadcast(0x35, true, "{0} moongates generated.", count);
 		}
@@ -393,6 +402,9 @@ namespace Server.Items
 		public static readonly PMList[] RedLists = {Felucca};
 		public static readonly PMList[] SigilLists = {Felucca};
 
+		// T2A (pre-Renaissance): Felucca is the only travel destination.
+		public static readonly PMList[] FeluccaLists = {Felucca};
+
 		public static readonly PMList[] AllLists = { Trammel, Felucca, Ilshenar, Malas, Tokuno, TerMur };
 
 		public static PMList GetList(Map map)
@@ -529,9 +541,13 @@ namespace Server.Items
 					{
 						checkLists = PMList.LBRLists;
 					}
-					else
+					else if (Core.UOR)
 					{
 						checkLists = PMList.UORLists;
+					}
+					else
+					{
+						checkLists = PMList.FeluccaLists;
 					}
 				}
 				else if (Sigil.ExistsOn(mobile))
@@ -563,9 +579,13 @@ namespace Server.Items
 					{
 						checkLists = young ? PMList.LBRListsYoung : PMList.LBRLists;
 					}
-					else
+					else if (Core.UOR)
 					{
 						checkLists = young ? PMList.UORListsYoung : PMList.UORLists;
+					}
+					else
+					{
+						checkLists = PMList.FeluccaLists;
 					}
 				}
 			}

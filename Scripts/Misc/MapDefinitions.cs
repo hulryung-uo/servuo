@@ -24,6 +24,15 @@ namespace Server.Misc
             }
             else
             {
+                /* NOTE (T2A): All facets are registered here regardless of expansion.
+                 * The T2A player experience is Felucca-only and is enforced elsewhere:
+                 *   - the client only receives the Felucca facet flag (ExpansionInfo T2A),
+                 *   - public moongates, world decoration and spawns are generated on Felucca only,
+                 *   - new characters start in Felucca (StartingCitiesT2A).
+                 * The sister facets are intentionally left registered because many static
+                 * initializers across the codebase (e.g. PMList) dereference Map.Trammel etc.
+                 * at type-load; unregistering them would crash the server on boot.
+                 */
                 RegisterMap(0, 0, 0, 7168, 4096, 4, "Felucca", MapRules.FeluccaRules);
                 RegisterMap(1, 1, 1, 7168, 4096, 0, "Trammel", MapRules.TrammelRules);
                 RegisterMap(2, 2, 2, 2304, 1600, 1, "Ilshenar", MapRules.TrammelRules);

@@ -85,7 +85,9 @@ namespace Server.Factions
         public static void Configure()
         {
             NewCoMLocation = Config.Get("Factions.NewCoMLocation", true);
-            Enabled = !Server.Engines.VvV.ViceVsVirtueSystem.Enabled;
+            // T2A predates both VvV and the formal Factions system (Factions launched ~UOR era).
+            // Note: with VvV disabled this would otherwise auto-enable Factions, so gate on era too.
+            Enabled = !Server.Engines.VvV.ViceVsVirtueSystem.Enabled && Core.UOR;
 
             EventSink.Login += OnLogin;
 

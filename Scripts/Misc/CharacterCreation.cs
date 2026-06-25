@@ -36,6 +36,45 @@ namespace Server.Misc
 			EventSink.CharacterCreated += EventSink_CharacterCreated;
 		}
 
+		// Returns false for skills that were not introduced yet in the current expansion.
+		public static bool IsSkillAvailableInEra(SkillName skill)
+		{
+			switch (skill)
+			{
+				case SkillName.Necromancy:
+				case SkillName.Focus:
+				case SkillName.Chivalry:
+					return Core.AOS;
+				case SkillName.Bushido:
+				case SkillName.Ninjitsu:
+					return Core.SE;
+				case SkillName.Spellweaving:
+					return Core.ML;
+				case SkillName.Mysticism:
+				case SkillName.Imbuing:
+				case SkillName.Throwing:
+					return Core.SA;
+				default:
+					return true;
+			}
+		}
+
+		// Zeroes the value and cap of any skill not available in the current expansion.
+		public static void NormalizeSkillsForEra(Mobile m)
+		{
+			if (m == null || m.Skills == null)
+				return;
+
+			for (var i = 0; i < m.Skills.Length; ++i)
+			{
+				if (!IsSkillAvailableInEra((SkillName)i))
+				{
+					m.Skills[i].Base = 0.0;
+					m.Skills[i].Cap = 0.0;
+				}
+			}
+		}
+
 		public static bool VerifyProfession(int profession)
 		{
 			if (profession < 0)
@@ -216,6 +255,10 @@ namespace Server.Misc
 						pm.Skills[i].Cap = skillcap;
 				}
 				
+				// Zero out skills that don't exist in the current expansion (e.g. all the
+				// AOS+ skills on a T2A shard) so they cannot be trained or shown as usable.
+				NormalizeSkillsForEra(pm);
+
 				pm.Profession = args.Profession;
 
 				if (pm.IsPlayer() && pm.Account.Young && !Siege.SiegeShard)
