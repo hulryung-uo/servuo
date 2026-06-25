@@ -6,7 +6,7 @@ namespace Server.Accounting
 {
 	public static class AccountGold
 	{
-		public static bool Enabled = true;
+		public static bool Enabled = false;
 
 		/// <summary>
 		/// This amount specifies the value at which point Gold turns to Platinum.

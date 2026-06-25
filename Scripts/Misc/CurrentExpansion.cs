@@ -24,21 +24,13 @@ namespace Server
             
 			TownCryerSystem.Enabled = Core.TOL;
 
-			ObjectPropertyList.Enabled = true;
-
-			// Enable AOS feature flags for client-side OPL tooltips and context menus
-			SupportedFeatures.Value |= FeatureFlags.AOS;
-			CharacterList.AdditionalFlags |= CharacterListFlags.AOS;
+			// T2A (pre-AOS): no object property list tooltips; classic single-click names.
+			ObjectPropertyList.Enabled = Core.AOS;
 
             Mobile.InsuranceEnabled = Core.AOS && !Siege.SiegeShard;
 			Mobile.VisibleDamageType = Core.AOS ? VisibleDamageType.Related : VisibleDamageType.None;
 			Mobile.GuildClickMessage = !Core.AOS;
 			Mobile.AsciiClickMessage = !Core.AOS;
-
-			if (ObjectPropertyList.Enabled)
-			{
-				PacketHandlers.SingleClickProps = true; // single click for everything is overriden to check object property list
-			}
 
 			if (!Core.AOS)
 			{
@@ -46,6 +38,11 @@ namespace Server
 			}
 
 			AOS.DisableStatInfluences();
+
+			if (ObjectPropertyList.Enabled)
+			{
+				PacketHandlers.SingleClickProps = true; // single click for everything is overriden to check object property list
+			}
 
 			Mobile.ActionDelay = Core.TOL ? 500 : Core.AOS ? 1000 : 500;
 			Mobile.AOSStatusHandler = AOS.GetStatus;
