@@ -24,13 +24,24 @@ namespace Server
             
 			TownCryerSystem.Enabled = Core.TOL;
 
-			// T2A (pre-AOS): no object property list tooltips; classic single-click names.
-			ObjectPropertyList.Enabled = Core.AOS;
+			// Hybrid: enable OPL (object property list) tooltips even on T2A as a QoL/readability
+			// feature. This only affects client-side display; T2A item rules are unchanged
+			// (items have no AOS properties, so tooltips just show name/durability/weight/etc.).
+			ObjectPropertyList.Enabled = true;
+
+			// The client only requests/draws tooltips when it sees the AOS feature flags.
+			SupportedFeatures.Value |= FeatureFlags.AOS;
+			CharacterList.AdditionalFlags |= CharacterListFlags.AOS;
 
             Mobile.InsuranceEnabled = Core.AOS && !Siege.SiegeShard;
 			Mobile.VisibleDamageType = Core.AOS ? VisibleDamageType.Related : VisibleDamageType.None;
 			Mobile.GuildClickMessage = !Core.AOS;
 			Mobile.AsciiClickMessage = !Core.AOS;
+
+			if (ObjectPropertyList.Enabled)
+			{
+				PacketHandlers.SingleClickProps = true; // single click for everything is overriden to check object property list
+			}
 
 			if (!Core.AOS)
 			{
@@ -38,11 +49,6 @@ namespace Server
 			}
 
 			AOS.DisableStatInfluences();
-
-			if (ObjectPropertyList.Enabled)
-			{
-				PacketHandlers.SingleClickProps = true; // single click for everything is overriden to check object property list
-			}
 
 			Mobile.ActionDelay = Core.TOL ? 500 : Core.AOS ? 1000 : 500;
 			Mobile.AOSStatusHandler = AOS.GetStatus;
