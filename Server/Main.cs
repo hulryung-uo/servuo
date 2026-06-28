@@ -842,7 +842,7 @@ namespace Server
             {
                 if (_NewLine)
                 {
-                    writer.Write(DateTime.UtcNow.ToString(DateFormat));
+                    writer.Write(DateTime.Now.ToString(DateFormat));
                     _NewLine = false;
                 }
 
@@ -856,7 +856,7 @@ namespace Server
             {
                 if (_NewLine)
                 {
-                    writer.Write(DateTime.UtcNow.ToString(DateFormat));
+                    writer.Write(DateTime.Now.ToString(DateFormat));
                     _NewLine = false;
                 }
 
@@ -870,7 +870,7 @@ namespace Server
             {
                 if (_NewLine)
                 {
-                    writer.Write(DateTime.UtcNow.ToString(DateFormat));
+                    writer.Write(DateTime.Now.ToString(DateFormat));
                 }
 
                 writer.WriteLine(line);

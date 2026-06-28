@@ -25,7 +25,8 @@ namespace System
         {
             get
             {
-                return String.Format("{0:D2}:{1:D2}:{2:D2} ", DateTime.UtcNow.Hour, DateTime.UtcNow.Minute, DateTime.UtcNow.Second);
+                var now = DateTime.Now; // local server time (KST when TZ=Asia/Seoul)
+                return String.Format("{0:D2}:{1:D2}:{2:D2} ", now.Hour, now.Minute, now.Second);
             }
         }
         public static void Initialize()
