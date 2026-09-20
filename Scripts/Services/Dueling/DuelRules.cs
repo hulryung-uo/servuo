@@ -30,6 +30,10 @@ namespace Server.Engines.Dueling
 
         public const string ValidTokens = "5x 7x katana broadsword vikingsword halberd fists any nobandage noarmor";
 
+        // Classic 5x/7x templates also cap stats: Str + Dex + Int <= 225 with no single stat above 100.
+        public const int StatTotalCap = 225;
+        public const int StatSingleCap = 100;
+
         public int SkillCap { get; set; }          // 0 = unlimited, otherwise 500 / 700 (skill points, i.e. 50.0 / 70.0 per skill x10)
         public DuelWeapon Weapon { get; set; }
         public bool NoBandage { get; set; }
@@ -99,7 +103,7 @@ namespace Server.Engines.Dueling
             return total;
         }
 
-        /// <summary>Returns false (with a reason) if the fighter's capped-skill total exceeds the rule cap.</summary>
+        /// <summary>Returns false (with a reason) if the fighter's capped-skill total or raw stats exceed the 5x/7x template caps.</summary>
         public bool CheckSkills(Mobile m, out string reason)
         {
             reason = null;
@@ -107,11 +111,29 @@ namespace Server.Engines.Dueling
             if (SkillCap <= 0)
                 return true;
 
+            string rule = String.Format("{0}x rule", SkillCap / 100);
             double total = SkillTotal(m);
 
             if (total > SkillCap)
             {
-                reason = String.Format("{0}'s skills total {1:F1} > {2} ({3}x rule).", m.Name, total, SkillCap, SkillCap / 100);
+                reason = String.Format("{0}'s skills total {1:F1} > {2} ({3}).", m.Name, total, SkillCap, rule);
+                return false;
+            }
+
+            int statTotal = m.RawStr + m.RawDex + m.RawInt;
+
+            if (statTotal > StatTotalCap)
+            {
+                reason = String.Format("{0}'s stats total {1} > {2} ({3}).", m.Name, statTotal, StatTotalCap, rule);
+                return false;
+            }
+
+            if (m.RawStr > StatSingleCap || m.RawDex > StatSingleCap || m.RawInt > StatSingleCap)
+            {
+                string stat = m.RawStr > StatSingleCap ? "Str" : (m.RawDex > StatSingleCap ? "Dex" : "Int");
+                int value = m.RawStr > StatSingleCap ? m.RawStr : (m.RawDex > StatSingleCap ? m.RawDex : m.RawInt);
+
+                reason = String.Format("{0}'s {1} {2} > {3} ({4}).", m.Name, stat, value, StatSingleCap, rule);
                 return false;
             }
 
