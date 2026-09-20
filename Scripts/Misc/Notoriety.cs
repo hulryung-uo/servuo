@@ -354,6 +354,9 @@ namespace Server.Misc
 			if (PVPArenaSystem.IsFriendly(source, target))
 				return Notoriety.Ally;
 
+			if (Server.Engines.Dueling.DuelSystem.IsEnemy(source, target))
+				return Notoriety.Enemy;
+
 			if (target.IsStaff())
 				return Notoriety.CanBeAttacked;
 

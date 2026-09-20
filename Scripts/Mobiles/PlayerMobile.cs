@@ -3201,6 +3201,11 @@ namespace Server.Mobiles
                 }
             }
 
+            if (!Server.Engines.Dueling.DuelSystem.AllowEquip(this, item))
+            {
+                return false;
+            }
+
 			#region Factions
 			FactionItem factionItem = FactionItem.Find(item);
 
@@ -3856,6 +3861,12 @@ namespace Server.Mobiles
 
 		public override DeathMoveResult GetParentMoveResultFor(Item item)
 		{
+			// Duelists keep their gear; mounts still go through the base path so the rider is dismounted.
+			if (item.Layer != Layer.Mount && Server.Engines.Dueling.DuelSystem.KeepsItemsOnDeath(this))
+			{
+				return DeathMoveResult.RemainEquiped;
+			}
+
 			if (CheckInsuranceOnDeath(item) && !Young)
 			{
 				return DeathMoveResult.MoveToBackpack;
@@ -3873,6 +3884,11 @@ namespace Server.Mobiles
 
 		public override DeathMoveResult GetInventoryMoveResultFor(Item item)
 		{
+			if (Server.Engines.Dueling.DuelSystem.KeepsItemsOnDeath(this))
+			{
+				return DeathMoveResult.MoveToBackpack;
+			}
+
 			if (CheckInsuranceOnDeath(item) && !Young)
 			{
 				return DeathMoveResult.MoveToBackpack;

@@ -665,6 +665,10 @@ namespace Server.Items
             {
                 healer.SendLocalizedMessage(501042); // Target cannot be resurrected at that location.
             }
+            else if (!Server.Engines.Dueling.DuelSystem.AllowBandage(healer, patient))
+            {
+                // message already sent by the duel system
+            }
             else if (healer.CanBeBeneficial(patient, true, true))
             {
                 healer.DoBeneficial(patient);
