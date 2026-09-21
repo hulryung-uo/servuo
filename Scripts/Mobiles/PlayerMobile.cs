@@ -3862,9 +3862,11 @@ namespace Server.Mobiles
 		public override DeathMoveResult GetParentMoveResultFor(Item item)
 		{
 			// Duelists keep their gear; mounts still go through the base path so the rider is dismounted.
-			if (item.Layer != Layer.Mount && Server.Engines.Dueling.DuelSystem.KeepsItemsOnDeath(this))
+			DeathMoveResult duelResult;
+
+			if (item.Layer != Layer.Mount && Server.Engines.Dueling.DuelSystem.TryGetDeathMoveResult(this, item, out duelResult))
 			{
-				return DeathMoveResult.RemainEquiped;
+				return duelResult;
 			}
 
 			if (CheckInsuranceOnDeath(item) && !Young)

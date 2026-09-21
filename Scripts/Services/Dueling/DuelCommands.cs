@@ -103,8 +103,8 @@ namespace Server.Engines.Dueling
             return true;
         }
 
-        [Usage("Challenge <name> [rounds] [rules]")]
-        [Description("Challenges another player to a best-of-N duel in the arena, e.g. [Challenge Rook 3 5x-katana. They answer with [Accept or [Decline.")]
+        [Usage("Challenge <name|0xSerial> [rounds] [rules]")]
+        [Description("Challenges another player to a best-of-N duel in a free arena, e.g. [Challenge Rook 3 5x-katana. They answer with [Accept or [Decline.")]
         private static void Challenge_OnCommand(CommandEventArgs e)
         {
             var from = e.Mobile as PlayerMobile;
@@ -124,7 +124,7 @@ namespace Server.Engines.Dueling
                 return;
             }
 
-            PlayerMobile target = DuelSystem.FindOnlinePlayer(e.Arguments[0]);
+            PlayerMobile target = DuelSystem.FindOnlinePlayer(e.Arguments[0], from);
 
             if (target == null)
             {
@@ -230,8 +230,8 @@ namespace Server.Engines.Dueling
                             return;
                         }
 
-                        PlayerMobile a = DuelSystem.FindOnlinePlayer(e.Arguments[1]);
-                        PlayerMobile b = DuelSystem.FindOnlinePlayer(e.Arguments[2]);
+                        PlayerMobile a = DuelSystem.FindOnlinePlayer(e.Arguments[1], from);
+                        PlayerMobile b = DuelSystem.FindOnlinePlayer(e.Arguments[2], a ?? from);
 
                         if (a == null || b == null)
                         {

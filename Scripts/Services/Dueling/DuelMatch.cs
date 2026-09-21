@@ -181,6 +181,7 @@ namespace Server.Engines.Dueling
                 m.Resurrect();
 
             RemoveDeathRobe(m);
+            DuelSystem.RestoreOuterTorso(m);
 
             m.MoveToWorld(MarkOf(m), DuelArena.ArenaMap);
             FullHeal(m);
@@ -431,6 +432,7 @@ namespace Server.Engines.Dueling
                 m.Resurrect();
 
             RemoveDeathRobe(m);
+            DuelSystem.RestoreOuterTorso(m);
             FullHeal(m);
 
             m.Combatant = null;

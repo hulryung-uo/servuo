@@ -102,6 +102,41 @@ namespace Server.Engines.Dueling
             return FindMatchOf(m) != null || DuelArena.Find(m) != null;
         }
 
+        private static readonly Dictionary<Mobile, Item> m_OuterTorso = new Dictionary<Mobile, Item>();
+
+        /// <summary>
+        /// Death hook for worn items. Everything stays equipped except the OuterTorso piece, which is parked in the
+        /// backpack so the death shroud can take its layer; RestoreOuterTorso puts it back after resurrection.
+        /// </summary>
+        public static bool TryGetDeathMoveResult(Mobile m, Item item, out DeathMoveResult result)
+        {
+            result = DeathMoveResult.RemainEquiped;
+
+            if (!KeepsItemsOnDeath(m))
+                return false;
+
+            if (item.Layer == Layer.OuterTorso)
+            {
+                m_OuterTorso[m] = item;
+                result = DeathMoveResult.MoveToBackpack;
+            }
+
+            return true;
+        }
+
+        public static void RestoreOuterTorso(Mobile m)
+        {
+            Item item;
+
+            if (m == null || !m_OuterTorso.TryGetValue(m, out item))
+                return;
+
+            m_OuterTorso.Remove(m);
+
+            if (item != null && !item.Deleted && m.Alive && item.Parent == m.Backpack && m.FindItemOnLayer(Layer.OuterTorso) == null)
+                m.EquipItem(item);
+        }
+
         /// <summary>Opposing fighters are "Enemy" (orange) to each other for the whole match, so no criminal flags or murder counts.</summary>
         public static bool IsEnemy(Mobile source, Mobile target)
         {
@@ -177,18 +212,53 @@ namespace Server.Engines.Dueling
 
         public static PlayerMobile FindOnlinePlayer(string name)
         {
+            return FindOnlinePlayer(name, null);
+        }
+
+        /// <summary>
+        /// Resolves a fighter by serial ("0x880") or by name. Names are not unique, so among online namesakes
+        /// the one not already in a match and closest to 'near' (the issuer) wins.
+        /// </summary>
+        public static PlayerMobile FindOnlinePlayer(string name, Mobile near)
+        {
             if (String.IsNullOrWhiteSpace(name))
                 return null;
+
+            if (name.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            {
+                int serial;
+
+                if (Int32.TryParse(name.Substring(2), System.Globalization.NumberStyles.HexNumber, null, out serial))
+                {
+                    var bySerial = World.FindMobile(serial) as PlayerMobile;
+
+                    return bySerial != null && !bySerial.Deleted && bySerial.NetState != null ? bySerial : null;
+                }
+            }
+
+            PlayerMobile best = null;
+            bool bestFree = false;
+            int bestDistance = Int32.MaxValue;
 
             foreach (NetState ns in NetState.Instances)
             {
                 var pm = ns.Mobile as PlayerMobile;
 
-                if (pm != null && !pm.Deleted && Insensitive.Equals(pm.Name, name))
-                    return pm;
+                if (pm == null || pm.Deleted || !Insensitive.Equals(pm.Name, name))
+                    continue;
+
+                bool free = FindMatchOf(pm) == null;
+                int distance = (near != null && near.Map == pm.Map) ? (int)near.GetDistanceToSqrt(pm) : Int32.MaxValue - 1;
+
+                if (best == null || (free && !bestFree) || (free == bestFree && distance < bestDistance))
+                {
+                    best = pm;
+                    bestFree = free;
+                    bestDistance = distance;
+                }
             }
 
-            return null;
+            return best;
         }
 
         /// <summary>Returns null if the player may enter a match right now, otherwise the reason (already prefixed).</summary>
@@ -230,6 +300,12 @@ namespace Server.Engines.Dueling
             if (target.NetState == null)
             {
                 challenger.SendMessage(MessageHue, String.Format("[Duel] {0} is not online.", target.Name));
+                return;
+            }
+
+            if (FindMatchOf(target) != null)
+            {
+                challenger.SendMessage(MessageHue, String.Format("[Duel] {0} is already in a match.", target.Name));
                 return;
             }
 
