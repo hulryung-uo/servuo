@@ -197,6 +197,9 @@ namespace Server.Engines.Dueling
 
             m.Poison = null;
             m.Paralyzed = false;
+            m.MagicDamageAbsorb = 0; // Magic Reflection / Reactive Armor don't carry over between rounds
+            m.MeleeDamageAbsorb = 0;
+            m.RevealingAction();
             m.Hits = m.HitsMax;
             m.Stam = m.StamMax;
             m.Mana = m.ManaMax;

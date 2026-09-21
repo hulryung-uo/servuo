@@ -146,6 +146,25 @@ namespace Server.Engines.Dueling
             if (m.IsStaff())
                 return base.OnBeginSpellCast(m, s);
 
+            var match = Match;
+
+            if (match != null && match.Rules.Magic && match.IsFighter(m))
+            {
+                if (match.Phase != DuelPhase.Fighting)
+                {
+                    m.SendMessage(DuelSystem.MessageHue, "[Duel] Wait for FIGHT! before casting.");
+                    return false;
+                }
+
+                if (DuelRules.IsSpellBlocked(s))
+                {
+                    m.SendMessage(DuelSystem.MessageHue, "[Duel] That spell is not allowed in the arena.");
+                    return false;
+                }
+
+                return base.OnBeginSpellCast(m, s);
+            }
+
             m.SendMessage(DuelSystem.MessageHue, "[Duel] Spellcasting is not allowed in the arena.");
             return false;
         }

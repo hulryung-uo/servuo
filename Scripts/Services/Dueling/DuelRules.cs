@@ -2,6 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using Server.Items;
+using Server.Spells;
+using Server.Spells.Third;
+using Server.Spells.Fourth;
+using Server.Spells.Fifth;
+using Server.Spells.Sixth;
+using Server.Spells.Seventh;
+using Server.Spells.Eighth;
 
 namespace Server.Engines.Dueling
 {
@@ -18,17 +25,19 @@ namespace Server.Engines.Dueling
     /// <summary>
     /// Rule set for a duel, parsed from a token string such as "5x-katana-nobandage".
     /// Tokens: 5x | 7x (skill cap), katana | broadsword | vikingsword | halberd | fists | any (weapon),
-    /// nobandage, noarmor. Separators: - , + / or whitespace. Default is "any".
+    /// magic (allow spellcasting), nobandage, noarmor. Separators: - , + / or whitespace. Default is "any".
     /// </summary>
     public class DuelRules
     {
         public static readonly SkillName[] CappedSkills =
         {
             SkillName.Swords, SkillName.Tactics, SkillName.Anatomy, SkillName.Healing,
-            SkillName.MagicResist, SkillName.Parry, SkillName.Hiding, SkillName.Wrestling
+            SkillName.MagicResist, SkillName.Parry, SkillName.Hiding, SkillName.Wrestling,
+            SkillName.Magery, SkillName.EvalInt, SkillName.Meditation,
+            SkillName.Fencing, SkillName.Macing, SkillName.Archery
         };
 
-        public const string ValidTokens = "5x 7x katana broadsword vikingsword halberd fists any nobandage noarmor";
+        public const string ValidTokens = "5x 7x katana broadsword vikingsword halberd fists any magic nobandage noarmor";
 
         // Classic 5x/7x templates also cap stats: Str + Dex + Int <= 225 with no single stat above 100.
         public const int StatTotalCap = 225;
@@ -36,6 +45,7 @@ namespace Server.Engines.Dueling
 
         public int SkillCap { get; set; }          // 0 = unlimited, otherwise 500 / 700 (skill points, i.e. 50.0 / 70.0 per skill x10)
         public DuelWeapon Weapon { get; set; }
+        public bool Magic { get; set; }            // spellcasting allowed while the round is live (still no fields/summons/travel/resurrection)
         public bool NoBandage { get; set; }
         public bool NoArmor { get; set; }
 
@@ -65,6 +75,7 @@ namespace Server.Engines.Dueling
                     case "vikingsword": rules.Weapon = DuelWeapon.VikingSword; break;
                     case "halberd": rules.Weapon = DuelWeapon.Halberd; break;
                     case "fists": rules.Weapon = DuelWeapon.Fists; break;
+                    case "magic": rules.Magic = true; break;
                     case "nobandage": rules.NoBandage = true; break;
                     case "noarmor": rules.NoArmor = true; break;
                     default:
@@ -87,6 +98,7 @@ namespace Server.Engines.Dueling
             if (Weapon != DuelWeapon.Any)
                 parts.Add(Weapon.ToString().ToLowerInvariant());
 
+            if (Magic) parts.Add("magic");
             if (NoBandage) parts.Add("nobandage");
             if (NoArmor) parts.Add("noarmor");
 
@@ -138,6 +150,16 @@ namespace Server.Engines.Dueling
             }
 
             return true;
+        }
+
+        /// <summary>Spells never allowed in the arena even under the magic rule: fields, summons, travel, resurrection.</summary>
+        public static bool IsSpellBlocked(ISpell spell)
+        {
+            return spell is FireFieldSpell || spell is PoisonFieldSpell || spell is ParalyzeFieldSpell || spell is EnergyFieldSpell || spell is WallOfStoneSpell
+                || spell is BladeSpiritsSpell || spell is EnergyVortexSpell || spell is SummonCreatureSpell || spell is SummonDaemonSpell
+                || spell is AirElementalSpell || spell is EarthElementalSpell || spell is FireElementalSpell || spell is WaterElementalSpell
+                || spell is RecallSpell || spell is GateTravelSpell || spell is MarkSpell || spell is TeleportSpell
+                || spell is ResurrectionSpell;
         }
 
         public bool IsWeaponAllowed(Item item)
