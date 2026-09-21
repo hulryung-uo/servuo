@@ -17,11 +17,58 @@ namespace Server.Misc
     {
         public static string ServerName { get; } = Config.Get("Server.Name", "My Shard");
 
-        public static IPAddress Address { get; } = Config.Get("Server.Address", IPAddress.Loopback);
+        // Server.Address may be an IP literal or a hostname (e.g. a DDNS name). Hostnames are resolved
+        // at startup and re-resolved every ResolveInterval so a changing public IP keeps working.
+        private static readonly string AddressSetting = Config.Get("Server.Address", "127.0.0.1");
+        private static readonly TimeSpan ResolveInterval = TimeSpan.FromMinutes(10.0);
+
+        private static IPAddress m_Address;
+        private static DateTime m_NextResolve;
+
+        public static IPAddress Address { get { return ResolveAddress(); } }
+
+        private static IPAddress ResolveAddress()
+        {
+            IPAddress literal;
+
+            if (String.IsNullOrWhiteSpace(AddressSetting))
+                return IPAddress.Loopback;
+
+            if (IPAddress.TryParse(AddressSetting, out literal))
+                return literal;
+
+            if (m_Address != null && DateTime.UtcNow < m_NextResolve)
+                return m_Address;
+
+            m_NextResolve = DateTime.UtcNow + ResolveInterval;
+
+            try
+            {
+                foreach (IPAddress ip in Dns.GetHostAddresses(AddressSetting))
+                {
+                    if (ip.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        if (!ip.Equals(m_Address))
+                            Console.WriteLine("ServerList: '{0}' resolved to {1}", AddressSetting, ip);
+
+                        m_Address = ip;
+                        break;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("ServerList: could not resolve '{0}': {1}", AddressSetting, e.Message);
+            }
+
+            return m_Address ?? IPAddress.Loopback;
+        }
 
         public static void Initialize()
         {
             Console.Title = ServerName;
+
+            ResolveAddress();
 
 			EventSink.ServerList += EventSink_ServerList;
 		}
