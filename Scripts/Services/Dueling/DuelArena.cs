@@ -9,9 +9,11 @@ using Server.Spells;
 namespace Server.Engines.Dueling
 {
     /// <summary>
-    /// One fenced 9x5 dueling ring with its own region, start marks, lobby exits and duel stone.
-    /// Arena 1 sits on the z=20 plateau SW of the Minoc ridge; arenas 2-4 are on the empty grass strip
-    /// in the north-east map quadrant (z=15, no spawns), 80 tiles apart so nothing can cross between them.
+    /// One fenced dueling ring with its own region, start marks, lobby exits and duel stone.
+    /// Arena 1 sits on the z=20 plateau SW of the Minoc ridge; the rest are laid out on the empty grass strip
+    /// in the north-east map quadrant (z=15, no spawns, x5120-5375 y304-511), far enough apart that spells,
+    /// corpses and announcements cannot cross. Standard rings have a 9x5 floor; 13 is a 21x13 "large" ring
+    /// and 14 a 25x3 corridor.
     /// </summary>
     public class DuelArena
     {
@@ -21,12 +23,9 @@ namespace Server.Engines.Dueling
 
         public const int AnnounceRange = 24;
 
-        // Ring geometry, relative to the outer (fence) rectangle's top-left corner: outer 11x7, floor 9x5.
-        public const int OuterWidth = 11;
-        public const int OuterHeight = 7;
-
         public int Id { get; private set; }
         public int Z { get; private set; }
+        public string Shape { get; private set; }
 
         /// <summary>Region bounds: fence ring included.</summary>
         public Rectangle2D Bounds { get; private set; }
@@ -49,20 +48,34 @@ namespace Server.Engines.Dueling
 
         public bool Busy { get { return Match != null && Match.Phase != DuelPhase.Finished; } }
 
-        private DuelArena(int id, int outerX, int outerY, int z)
+        /// <param name="outerX">Top-left corner of the fence rectangle.</param>
+        /// <param name="floorWidth">Walkable floor size inside the fence (fence rectangle is 2 larger).</param>
+        /// <param name="markInset">Distance of each start mark from its side of the floor.</param>
+        private DuelArena(int id, string shape, int outerX, int outerY, int z, int floorWidth, int floorHeight, int markInset)
         {
             Id = id;
+            Shape = shape;
             Z = z;
 
-            Bounds = new Rectangle2D(outerX, outerY, OuterWidth, OuterHeight);
-            Floor = new Rectangle2D(outerX + 1, outerY + 1, OuterWidth - 2, OuterHeight - 2);
+            int outerWidth = floorWidth + 2, outerHeight = floorHeight + 2;
 
-            MarkA = new Point3D(outerX + 2, outerY + 3, z);
-            MarkB = new Point3D(outerX + 8, outerY + 3, z);
-            ExitA = new Point3D(outerX + 2, outerY + 8, z);
-            ExitB = new Point3D(outerX + 8, outerY + 8, z);
-            StoneLocation = new Point3D(outerX + 5, outerY + 8, z);
-            Center = new Point3D(outerX + 5, outerY + 3, z);
+            Bounds = new Rectangle2D(outerX, outerY, outerWidth, outerHeight);
+            Floor = new Rectangle2D(outerX + 1, outerY + 1, floorWidth, floorHeight);
+
+            int midY = outerY + 1 + floorHeight / 2;
+            int lobbyY = outerY + outerHeight + 1; // one tile of grass between the south fence and the lobby row
+
+            MarkA = new Point3D(outerX + 1 + markInset, midY, z);
+            MarkB = new Point3D(outerX + floorWidth - markInset, midY, z);
+            ExitA = new Point3D(MarkA.X, lobbyY, z);
+            ExitB = new Point3D(MarkB.X, lobbyY, z);
+            StoneLocation = new Point3D(outerX + outerWidth / 2, lobbyY, z);
+            Center = new Point3D(outerX + outerWidth / 2, midY, z);
+        }
+
+        private static DuelArena Standard(int id, int outerX, int outerY, int z)
+        {
+            return new DuelArena(id, "standard 9x5", outerX, outerY, z, 9, 5, 1);
         }
 
         /// <summary>Creates the arena definitions and registers their regions. Called once from DuelSystem.Initialize.</summary>
@@ -71,10 +84,23 @@ namespace Server.Engines.Dueling
             if (All.Count > 0)
                 return;
 
-            All.Add(new DuelArena(1, 2597, 488, 20)); // Minoc ridge plateau
-            All.Add(new DuelArena(2, 5175, 317, 15)); // NE grass strip
-            All.Add(new DuelArena(3, 5255, 317, 15));
-            All.Add(new DuelArena(4, 5335, 317, 15));
+            All.Add(Standard(1, 2597, 488, 20)); // Minoc ridge plateau
+
+            // NE grass strip: three columns 80 tiles apart, rows 58 tiles apart.
+            All.Add(Standard(2, 5175, 317, 15));
+            All.Add(Standard(3, 5255, 317, 15));
+            All.Add(Standard(4, 5335, 317, 15));
+            All.Add(Standard(5, 5175, 375, 15));
+            All.Add(Standard(6, 5255, 375, 15));
+            All.Add(Standard(7, 5335, 375, 15));
+            All.Add(Standard(8, 5175, 433, 15));
+            All.Add(Standard(9, 5255, 433, 15));
+            All.Add(Standard(10, 5335, 433, 15));
+            All.Add(Standard(11, 5175, 491, 15));
+            All.Add(Standard(12, 5255, 491, 15));
+
+            All.Add(new DuelArena(13, "large 21x13", 5305, 483, 15, 21, 13, 3));  // kiting room; marks 14 apart
+            All.Add(new DuelArena(14, "corridor 25x3", 5130, 325, 15, 25, 3, 5)); // no kiting; marks 14 apart
 
             foreach (DuelArena arena in All)
             {
@@ -211,7 +237,8 @@ namespace Server.Engines.Dueling
 
         public string Describe()
         {
-            return String.Format("Arena {0}: marks {1} / {2}, exits {3} / {4}, stone {5}", Id, MarkA, MarkB, ExitA, ExitB, StoneLocation);
+            return String.Format("Arena {0} ({1}): floor x{2}-{3} y{4}-{5} z{6}, marks {7} / {8}, exits {9} / {10}, stone {11}",
+                Id, Shape, Floor.Start.X, Floor.End.X - 1, Floor.Start.Y, Floor.End.Y - 1, Z, MarkA, MarkB, ExitA, ExitB, StoneLocation);
         }
     }
 

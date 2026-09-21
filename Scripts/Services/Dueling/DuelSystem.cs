@@ -26,14 +26,16 @@ namespace Server.Engines.Dueling
         public PlayerMobile Target { get; private set; }
         public int Rounds { get; private set; }
         public DuelRules Rules { get; private set; }
+        public DuelArena Arena { get; private set; } // requested arena, or null for "any free"
         public DateTime Expires { get; private set; }
 
-        public DuelChallenge(PlayerMobile challenger, PlayerMobile target, int rounds, DuelRules rules)
+        public DuelChallenge(PlayerMobile challenger, PlayerMobile target, int rounds, DuelRules rules, DuelArena arena)
         {
             Challenger = challenger;
             Target = target;
             Rounds = rounds;
             Rules = rules;
+            Arena = arena;
             Expires = DateTime.UtcNow + Lifetime;
         }
 
@@ -262,7 +264,7 @@ namespace Server.Engines.Dueling
         }
 
         /// <summary>Returns null if the player may enter a match right now, otherwise the reason (already prefixed).</summary>
-        public static string CheckAvailable(PlayerMobile pm, DuelRules rules)
+        public static string CheckAvailable(PlayerMobile pm, DuelRules rules, DuelArena requested)
         {
             if (pm == null || pm.Deleted || pm.NetState == null)
                 return "[Duel] That player is not online.";
@@ -270,7 +272,10 @@ namespace Server.Engines.Dueling
             if (FindMatchOf(pm) != null)
                 return String.Format("[Duel] {0} is already in a match.", pm.Name);
 
-            if (DuelArena.FindFree() == null)
+            if (requested != null && requested.Busy)
+                return String.Format("[Duel] Arena {0} is busy.", requested.Id);
+
+            if (requested == null && DuelArena.FindFree() == null)
                 return "[Duel] All arenas are busy.";
 
             string reason;
@@ -281,7 +286,7 @@ namespace Server.Engines.Dueling
             return null;
         }
 
-        public static void Challenge(PlayerMobile challenger, PlayerMobile target, int rounds, DuelRules rules)
+        public static void Challenge(PlayerMobile challenger, PlayerMobile target, int rounds, DuelRules rules, DuelArena arena)
         {
             if (challenger == target)
             {
@@ -289,7 +294,7 @@ namespace Server.Engines.Dueling
                 return;
             }
 
-            string problem = CheckAvailable(challenger, rules);
+            string problem = CheckAvailable(challenger, rules, arena);
 
             if (problem != null)
             {
@@ -313,7 +318,7 @@ namespace Server.Engines.Dueling
             foreach (Mobile key in m_Pending.Where(kv => kv.Value.Challenger == challenger).Select(kv => kv.Key).ToList())
                 m_Pending.Remove(key);
 
-            m_Pending[target] = new DuelChallenge(challenger, target, rounds, rules);
+            m_Pending[target] = new DuelChallenge(challenger, target, rounds, rules, arena);
 
             string text = String.Format("[Duel] {0} has challenged {1}: best of {2}, rules {3}. Say [Accept to fight.", challenger.Name, target.Name, rounds, rules);
 
@@ -335,7 +340,7 @@ namespace Server.Engines.Dueling
 
             PlayerMobile challenger = challenge.Challenger;
 
-            string problem = CheckAvailable(challenger, challenge.Rules);
+            string problem = CheckAvailable(challenger, challenge.Rules, challenge.Arena);
 
             if (problem != null)
             {
@@ -344,7 +349,7 @@ namespace Server.Engines.Dueling
                 return;
             }
 
-            problem = CheckAvailable(pm, challenge.Rules);
+            problem = CheckAvailable(pm, challenge.Rules, challenge.Arena);
 
             if (problem != null)
             {
@@ -359,7 +364,7 @@ namespace Server.Engines.Dueling
             pm.SendMessage(MessageHue, text);
             challenger.SendMessage(MessageHue, text);
 
-            StartMatch(challenger, pm, challenge.Rounds, challenge.Rules);
+            StartMatch(challenger, pm, challenge.Rounds, challenge.Rules, null, challenge.Arena);
         }
 
         public static void Decline(PlayerMobile pm)
@@ -407,7 +412,7 @@ namespace Server.Engines.Dueling
         }
 
         /// <summary>Starts a match immediately (used by [Accept and the staff [Duel start shortcut). Returns false with a message to 'issuer' on failure.</summary>
-        public static bool StartMatch(PlayerMobile a, PlayerMobile b, int rounds, DuelRules rules, Mobile issuer = null)
+        public static bool StartMatch(PlayerMobile a, PlayerMobile b, int rounds, DuelRules rules, Mobile issuer = null, DuelArena requested = null)
         {
             if (a == b)
             {
@@ -417,7 +422,7 @@ namespace Server.Engines.Dueling
 
             foreach (PlayerMobile pm in new[] { a, b })
             {
-                string problem = CheckAvailable(pm, rules);
+                string problem = CheckAvailable(pm, rules, requested);
 
                 if (problem != null)
                 {
@@ -428,11 +433,11 @@ namespace Server.Engines.Dueling
 
             rounds = Math.Max(1, Math.Min(MaxRounds, rounds));
 
-            DuelArena arena = DuelArena.FindFree();
+            DuelArena arena = requested ?? DuelArena.FindFree();
 
-            if (arena == null)
+            if (arena == null || arena.Busy)
             {
-                if (issuer != null) issuer.SendMessage(MessageHue, "[Duel] All arenas are busy.");
+                if (issuer != null) issuer.SendMessage(MessageHue, arena == null ? "[Duel] All arenas are busy." : String.Format("[Duel] Arena {0} is busy.", arena.Id));
                 return false;
             }
 

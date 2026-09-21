@@ -25,8 +25,8 @@ namespace Server.Engines.Dueling
 
         public static void SendUsage(Mobile m)
         {
-            m.SendMessage(DuelSystem.MessageHue, "[Duel] Commands: [Challenge <name> [rounds] [rules] | [Accept | [Decline | [DuelStats [name] | [Duel status | [Duel cancel");
-            m.SendMessage(DuelSystem.MessageHue, "[Duel] Rules: " + DuelRules.ValidTokens + " (join with '-', e.g. 5x-katana). Default: best of 3, rules any.");
+            m.SendMessage(DuelSystem.MessageHue, "[Duel] Commands: [Challenge <name|0xSerial> [rounds] [rules] [arena:N] | [Accept | [Decline | [DuelStats [name] | [Duel status | [Duel cancel");
+            m.SendMessage(DuelSystem.MessageHue, "[Duel] Rules: " + DuelRules.ValidTokens + " (join with '-', e.g. 5x-katana). Default: best of 3, rules any, any free arena.");
 
             if (m.AccessLevel >= AccessLevel.GameMaster)
                 m.SendMessage(DuelSystem.MessageHue, "[Duel] Staff: [Duel start <A> <B> [rounds] [rules] | [DuelReset [arena] | [Duel arena build [arena] | [Duel arena go [arena]");
@@ -65,18 +65,48 @@ namespace Server.Engines.Dueling
             return true;
         }
 
-        /// <summary>Parses "[rounds] [rules...]" starting at args[index]. Returns false after messaging the issuer on a bad token.</summary>
-        private static bool ParseRoundsAndRules(CommandEventArgs e, int index, out int rounds, out DuelRules rules)
+        /// <summary>
+        /// Parses "[rounds] [rules...] [arena:N]" starting at args[index]; "arena:N" may appear anywhere after the names.
+        /// Returns false after messaging the issuer on a bad token.
+        /// </summary>
+        private static bool ParseRoundsAndRules(CommandEventArgs e, int index, out int rounds, out DuelRules rules, out DuelArena arena)
         {
             rounds = DuelSystem.DefaultRounds;
             rules = DuelRules.Default;
+            arena = null;
 
-            if (e.Length <= index)
+            var args = new System.Collections.Generic.List<string>();
+
+            for (int i = index; i < e.Length; i++)
+            {
+                string arg = e.Arguments[i];
+
+                if (arg.StartsWith("arena:", StringComparison.OrdinalIgnoreCase))
+                {
+                    int id;
+
+                    if (Int32.TryParse(arg.Substring(6), out id))
+                        arena = DuelArena.Get(id);
+
+                    if (arena == null)
+                    {
+                        e.Mobile.SendMessage(DuelSystem.MessageHue, String.Format("[Duel] Unknown arena '{0}'. Arenas: 1-{1}.", arg.Substring(6), DuelArena.All.Count));
+                        return false;
+                    }
+                }
+                else
+                {
+                    args.Add(arg);
+                }
+            }
+
+            if (args.Count == 0)
                 return true;
 
             int parsed;
+            int skip = 0;
 
-            if (Int32.TryParse(e.Arguments[index], out parsed))
+            if (Int32.TryParse(args[0], out parsed))
             {
                 if (parsed < 1 || parsed > DuelSystem.MaxRounds)
                 {
@@ -85,13 +115,13 @@ namespace Server.Engines.Dueling
                 }
 
                 rounds = parsed;
-                index++;
+                skip = 1;
             }
 
-            if (e.Length <= index)
+            if (args.Count <= skip)
                 return true;
 
-            string text = String.Join(" ", e.Arguments.Skip(index));
+            string text = String.Join(" ", args.Skip(skip));
             string error;
 
             if (!DuelRules.TryParse(text, out rules, out error))
@@ -103,8 +133,8 @@ namespace Server.Engines.Dueling
             return true;
         }
 
-        [Usage("Challenge <name|0xSerial> [rounds] [rules]")]
-        [Description("Challenges another player to a best-of-N duel in a free arena, e.g. [Challenge Rook 3 5x-katana. They answer with [Accept or [Decline.")]
+        [Usage("Challenge <name|0xSerial> [rounds] [rules] [arena:N]")]
+        [Description("Challenges another player to a best-of-N duel in a free arena (or the given one), e.g. [Challenge Rook 3 5x-katana arena:2. They answer with [Accept or [Decline.")]
         private static void Challenge_OnCommand(CommandEventArgs e)
         {
             var from = e.Mobile as PlayerMobile;
@@ -134,11 +164,12 @@ namespace Server.Engines.Dueling
 
             int rounds;
             DuelRules rules;
+            DuelArena arena;
 
-            if (!ParseRoundsAndRules(e, 1, out rounds, out rules))
+            if (!ParseRoundsAndRules(e, 1, out rounds, out rules, out arena))
                 return;
 
-            DuelSystem.Challenge(from, target, rounds, rules);
+            DuelSystem.Challenge(from, target, rounds, rules, arena);
         }
 
         [Usage("Accept")]
@@ -241,11 +272,12 @@ namespace Server.Engines.Dueling
 
                         int rounds;
                         DuelRules rules;
+                        DuelArena arena;
 
-                        if (!ParseRoundsAndRules(e, 3, out rounds, out rules))
+                        if (!ParseRoundsAndRules(e, 3, out rounds, out rules, out arena))
                             return;
 
-                        DuelSystem.StartMatch(a, b, rounds, rules, from);
+                        DuelSystem.StartMatch(a, b, rounds, rules, from, arena);
                         break;
                     }
                 case "stop":
