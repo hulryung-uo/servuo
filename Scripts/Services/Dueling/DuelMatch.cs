@@ -23,8 +23,8 @@ namespace Server.Engines.Dueling
         public static readonly TimeSpan RoundTimeLimit = TimeSpan.FromMinutes(3.0);
         public static readonly TimeSpan OfflineForfeit = TimeSpan.FromSeconds(30.0);
         public const int CountdownSeconds = 5;
-        public const int AnnounceRange = 24;
 
+        public DuelArena Arena { get; private set; }
         public PlayerMobile A { get; private set; }
         public PlayerMobile B { get; private set; }
         public int Rounds { get; private set; }
@@ -42,8 +42,9 @@ namespace Server.Engines.Dueling
         private DateTime m_OfflineSinceA = DateTime.MinValue;
         private DateTime m_OfflineSinceB = DateTime.MinValue;
 
-        public DuelMatch(PlayerMobile a, PlayerMobile b, int rounds, DuelRules rules)
+        public DuelMatch(DuelArena arena, PlayerMobile a, PlayerMobile b, int rounds, DuelRules rules)
         {
+            Arena = arena;
             A = a;
             B = b;
             Rounds = Math.Max(1, rounds);
@@ -63,12 +64,12 @@ namespace Server.Engines.Dueling
 
         private Point3D MarkOf(Mobile m)
         {
-            return m == A ? DuelArena.MarkA : DuelArena.MarkB;
+            return Arena.MarkOf(this, m);
         }
 
         private Point3D ExitOf(Mobile m)
         {
-            return m == A ? DuelArena.ExitA : DuelArena.ExitB;
+            return Arena.ExitOf(this, m);
         }
 
         private int WinsNeeded { get { return Rounds / 2 + 1; } }
@@ -97,24 +98,25 @@ namespace Server.Engines.Dueling
                 Round, A.Name, HpPercent(A), B.Name, HpPercent(B), m_HarmfulA, m_HarmfulB));
         }
 
+        /// <summary>State description without the "[Duel] ..." prefix; the caller adds "Status:" or "Arena N:".</summary>
         public string StatusLine()
         {
             switch (Phase)
             {
                 case DuelPhase.Finished:
-                    return String.Format("[Duel] Status: finished. {0} {1} - {2} {3}.", A.Name, ScoreA, ScoreB, B.Name);
+                    return String.Format("finished. {0} {1} - {2} {3}.", A.Name, ScoreA, ScoreB, B.Name);
                 case DuelPhase.Fighting:
-                    return String.Format("[Duel] Status: round {0} of {1} live ({2} seconds elapsed). {3} {4} - {5} {6}, rules {7}.",
+                    return String.Format("round {0} of {1} live ({2} seconds elapsed). {3} {4} - {5} {6}, rules {7}.",
                         Round, Rounds, (int)(DateTime.UtcNow - m_RoundStart).TotalSeconds, A.Name, ScoreA, ScoreB, B.Name, Rules);
                 default:
-                    return String.Format("[Duel] Status: round {0} of {1} starting. {2} {3} - {4} {5}, rules {6}.",
+                    return String.Format("round {0} of {1} starting. {2} {3} - {4} {5}, rules {6}.",
                         Round, Rounds, A.Name, ScoreA, ScoreB, B.Name, Rules);
             }
         }
 
         #region Messaging
 
-        /// <summary>Sends a fixed-format system message to both fighters and everyone near the arena, and logs it to the console.</summary>
+        /// <summary>Sends a fixed-format system message to both fighters and everyone near this arena, and logs it to the console.</summary>
         public void Announce(string text)
         {
             var seen = new HashSet<Mobile>();
@@ -125,7 +127,7 @@ namespace Server.Engines.Dueling
                     m.SendMessage(DuelSystem.MessageHue, text);
             }
 
-            var eable = DuelArena.ArenaMap.GetClientsInRange(DuelArena.Center, AnnounceRange);
+            var eable = DuelArena.ArenaMap.GetClientsInRange(Arena.Center, DuelArena.AnnounceRange);
 
             foreach (NetState ns in eable)
             {
@@ -146,9 +148,9 @@ namespace Server.Engines.Dueling
 
         public void Start()
         {
-            Announce(String.Format("[Duel] Start: {0} vs {1}, best of {2}, rules {3}.", A.Name, B.Name, Rounds, Rules));
+            Announce(String.Format("[Duel] Start: {0} vs {1}, best of {2}, rules {3}, arena {4}.", A.Name, B.Name, Rounds, Rules, Arena.Id));
 
-            DuelArena.EvictOthers(A, B);
+            Arena.EvictOthers(A, B);
             BeginRound();
         }
 
@@ -281,7 +283,7 @@ namespace Server.Engines.Dueling
             if (Phase != DuelPhase.Countdown && Phase != DuelPhase.Fighting)
                 return false;
 
-            if (!DuelArena.Contains(m))
+            if (!Arena.Contains(m))
             {
                 EndRound(Opponent(m), m, "forfeit: left the arena");
                 return true;
@@ -434,7 +436,7 @@ namespace Server.Engines.Dueling
             m.Combatant = null;
             m.Warmode = false;
 
-            if (m.Map == DuelArena.ArenaMap && DuelArena.Bounds.Contains(m.Location))
+            if (Arena.Contains(m))
                 m.MoveToWorld(ExitOf(m), DuelArena.ArenaMap);
         }
 

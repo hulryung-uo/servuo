@@ -41,8 +41,8 @@ namespace Server.Engines.Dueling
     }
 
     /// <summary>
-    /// T2A-friendly player duel system: speech commands, a single fixed arena (see DuelArena), best-of-N rounds,
-    /// no corpse looting / murder counts for fighters, plain "[Duel] ..." journal lines.
+    /// T2A-friendly player duel system: speech commands, several fixed arenas (see DuelArena) running independent
+    /// best-of-N matches at once, no corpse looting / murder counts for fighters, plain "[Duel] ..." journal lines.
     /// </summary>
     public static class DuelSystem
     {
@@ -52,8 +52,7 @@ namespace Server.Engines.Dueling
 
         public static readonly string SavePath = Path.Combine("Saves", "Dueling.bin");
 
-        public static DuelRegion Region { get; private set; }
-        public static DuelMatch Current { get; private set; }
+        public static readonly List<DuelMatch> Matches = new List<DuelMatch>();
 
         private static readonly Dictionary<Mobile, DuelChallenge> m_Pending = new Dictionary<Mobile, DuelChallenge>(); // keyed by challenged player
         private static readonly Dictionary<Mobile, DuelRecord> m_Stats = new Dictionary<Mobile, DuelRecord>();
@@ -67,13 +66,8 @@ namespace Server.Engines.Dueling
 
         public static void Initialize()
         {
-            Region = new DuelRegion();
-            Region.Register();
-
-            int fences = DuelArena.EnsureBuilt();
-
-            if (fences > 0)
-                Console.WriteLine("[Duel] Arena built: {0} fence pieces, stone at {1}.", fences, DuelArena.StoneLocation);
+            DuelArena.Setup();
+            DuelArena.EnsureAllBuilt();
 
             DuelCommands.Register();
 
@@ -82,34 +76,49 @@ namespace Server.Engines.Dueling
 
         #region Hooks used from core scripts (PlayerMobile, Notoriety, Bandage)
 
-        /// <summary>Fighters (and anyone dying inside the arena) keep every item; nothing goes to the corpse.</summary>
+        /// <summary>The unfinished match the mobile is fighting in, or null.</summary>
+        public static DuelMatch FindMatchOf(Mobile m)
+        {
+            if (m == null)
+                return null;
+
+            for (int i = 0; i < Matches.Count; i++)
+            {
+                DuelMatch match = Matches[i];
+
+                if (match.Phase != DuelPhase.Finished && match.IsFighter(m))
+                    return match;
+            }
+
+            return null;
+        }
+
+        /// <summary>Fighters (and anyone dying inside an arena) keep every item; nothing goes to the corpse.</summary>
         public static bool KeepsItemsOnDeath(Mobile m)
         {
             if (m == null)
                 return false;
 
-            var match = Current;
-
-            if (match != null && match.Phase != DuelPhase.Finished && match.IsFighter(m))
-                return true;
-
-            return DuelArena.Contains(m);
+            return FindMatchOf(m) != null || DuelArena.Find(m) != null;
         }
 
         /// <summary>Opposing fighters are "Enemy" (orange) to each other for the whole match, so no criminal flags or murder counts.</summary>
         public static bool IsEnemy(Mobile source, Mobile target)
         {
-            var match = Current;
+            if (source == target)
+                return false;
 
-            return match != null && source != target && match.IsFighter(source) && match.IsFighter(target);
+            var match = FindMatchOf(source);
+
+            return match != null && match.IsFighter(target);
         }
 
-        /// <summary>Equip check hook: refuse gear the current rules forbid while the wearer is a fighter in the arena.</summary>
+        /// <summary>Equip check hook: refuse gear the current rules forbid while the wearer is a fighter in a match.</summary>
         public static bool AllowEquip(Mobile m, Item item)
         {
-            var match = Current;
+            var match = FindMatchOf(m);
 
-            if (match == null || match.Phase == DuelPhase.Finished || !match.IsFighter(m))
+            if (match == null)
                 return true;
 
             string violation = match.Rules.GetEquipViolation(item);
@@ -123,18 +132,18 @@ namespace Server.Engines.Dueling
 
         public static bool AllowBandage(Mobile healer, Mobile patient)
         {
-            var match = Current;
-
-            if (match == null || match.Phase == DuelPhase.Finished || healer == null)
+            if (healer == null)
                 return true;
 
-            if (patient != null && healer != patient && match.IsFighter(patient))
+            if (patient != null && healer != patient && FindMatchOf(patient) != null)
             {
                 healer.SendMessage(MessageHue, "[Duel] You cannot heal a duelist during a match.");
                 return false;
             }
 
-            if (match.Rules.NoBandage && match.IsFighter(healer))
+            var match = FindMatchOf(healer);
+
+            if (match != null && match.Rules.NoBandage)
             {
                 healer.SendMessage(MessageHue, "[Duel] Bandages are not allowed in this duel.");
                 return false;
@@ -188,8 +197,11 @@ namespace Server.Engines.Dueling
             if (pm == null || pm.Deleted || pm.NetState == null)
                 return "[Duel] That player is not online.";
 
-            if (Current != null && Current.Phase != DuelPhase.Finished)
-                return String.Format("[Duel] The arena is busy: {0} vs {1} in progress.", Current.A.Name, Current.B.Name);
+            if (FindMatchOf(pm) != null)
+                return String.Format("[Duel] {0} is already in a match.", pm.Name);
+
+            if (DuelArena.FindFree() == null)
+                return "[Duel] All arenas are busy.";
 
             string reason;
 
@@ -340,35 +352,55 @@ namespace Server.Engines.Dueling
 
             rounds = Math.Max(1, Math.Min(MaxRounds, rounds));
 
+            DuelArena arena = DuelArena.FindFree();
+
+            if (arena == null)
+            {
+                if (issuer != null) issuer.SendMessage(MessageHue, "[Duel] All arenas are busy.");
+                return false;
+            }
+
             m_Pending.Remove(a);
             m_Pending.Remove(b);
 
-            Current = new DuelMatch(a, b, rounds, rules ?? DuelRules.Default);
-            Current.Start();
+            var match = new DuelMatch(arena, a, b, rounds, rules ?? DuelRules.Default);
+
+            arena.Match = match;
+            Matches.Add(match);
+            match.Start();
 
             return true;
         }
 
         public static void OnMatchFinished(DuelMatch match)
         {
-            if (Current == match)
-                Current = null;
+            Matches.Remove(match);
+
+            if (match.Arena.Match == match)
+                match.Arena.Match = null;
         }
 
-        /// <summary>Staff reset: abort the match, clear challenges, heal and unfreeze everyone standing in the arena.</summary>
-        public static void Reset(Mobile staff)
+        /// <summary>Staff reset: abort the match in one arena (or all), clear challenges, heal and unfreeze everyone standing there.</summary>
+        public static void Reset(Mobile staff, DuelArena only)
         {
-            var match = Current;
-
-            if (match != null)
-                match.Abort("reset by staff");
-
-            Current = null;
-            m_Pending.Clear();
-
-            if (Region != null)
+            foreach (DuelMatch match in Matches.ToList())
             {
-                foreach (Mobile m in Region.GetPlayers())
+                if (only == null || match.Arena == only)
+                    match.Abort("reset by staff");
+            }
+
+            if (only == null)
+                m_Pending.Clear();
+
+            foreach (DuelArena arena in DuelArena.All)
+            {
+                if (only != null && arena != only)
+                    continue;
+
+                if (arena.Busy)
+                    arena.Match = null;
+
+                foreach (Mobile m in arena.Region.GetPlayers())
                 {
                     m.Frozen = false;
 
@@ -379,7 +411,7 @@ namespace Server.Engines.Dueling
                 }
             }
 
-            staff.SendMessage(MessageHue, "[Duel] Reset complete.");
+            staff.SendMessage(MessageHue, only == null ? "[Duel] Reset complete." : String.Format("[Duel] Arena {0} reset complete.", only.Id));
         }
 
         #endregion

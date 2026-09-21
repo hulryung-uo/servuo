@@ -29,7 +29,40 @@ namespace Server.Engines.Dueling
             m.SendMessage(DuelSystem.MessageHue, "[Duel] Rules: " + DuelRules.ValidTokens + " (join with '-', e.g. 5x-katana). Default: best of 3, rules any.");
 
             if (m.AccessLevel >= AccessLevel.GameMaster)
-                m.SendMessage(DuelSystem.MessageHue, "[Duel] Staff: [Duel start <A> <B> [rounds] [rules] | [DuelReset | [Duel arena build | [Duel arena go");
+                m.SendMessage(DuelSystem.MessageHue, "[Duel] Staff: [Duel start <A> <B> [rounds] [rules] | [DuelReset [arena] | [Duel arena build [arena] | [Duel arena go [arena]");
+        }
+
+        /// <summary>"[Duel] Arena N: idle." or "[Duel] Arena N: round ..." for [Duel status and the duel stones.</summary>
+        public static string ArenaStatusLine(DuelArena arena)
+        {
+            DuelMatch match = arena.Match;
+
+            if (match == null || match.Phase == DuelPhase.Finished)
+                return String.Format("[Duel] Arena {0}: idle.", arena.Id);
+
+            return String.Format("[Duel] Arena {0}: {1}", arena.Id, match.StatusLine());
+        }
+
+        /// <summary>Optional arena id argument at args[index]; null (no error) when absent, error message sent when invalid.</summary>
+        private static bool ParseArena(CommandEventArgs e, int index, out DuelArena arena)
+        {
+            arena = null;
+
+            if (e.Length <= index)
+                return true;
+
+            int id;
+
+            if (Int32.TryParse(e.Arguments[index], out id))
+                arena = DuelArena.Get(id);
+
+            if (arena == null)
+            {
+                e.Mobile.SendMessage(DuelSystem.MessageHue, String.Format("[Duel] Unknown arena '{0}'. Arenas: 1-{1}.", e.Arguments[index], DuelArena.All.Count));
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>Parses "[rounds] [rules...]" starting at args[index]. Returns false after messaging the issuer on a bad token.</summary>
@@ -159,8 +192,8 @@ namespace Server.Engines.Dueling
                 from.SendMessage(DuelSystem.MessageHue, String.Format("[Duel] No stats for {0}.", name));
         }
 
-        [Usage("Duel status | help | cancel | start <A> <B> [rounds] [rules] | arena build|go")]
-        [Description("Duel system utilities. 'start' and 'arena' are staff only.")]
+        [Usage("Duel status | help | cancel | start <A> <B> [rounds] [rules] | arena build|go [arena]")]
+        [Description("Duel system utilities. 'start', 'reset' and 'arena' are staff only.")]
         private static void Duel_OnCommand(CommandEventArgs e)
         {
             Mobile from = e.Mobile;
@@ -170,8 +203,13 @@ namespace Server.Engines.Dueling
             {
                 case "status":
                     {
-                        var match = DuelSystem.Current;
-                        from.SendMessage(DuelSystem.MessageHue, match != null ? match.StatusLine() : "[Duel] Status: no match in progress.");
+                        int busy = DuelArena.All.Count(a => a.Busy);
+
+                        from.SendMessage(DuelSystem.MessageHue, String.Format("[Duel] Status: {0} of {1} arenas busy.", busy, DuelArena.All.Count));
+
+                        foreach (DuelArena arena in DuelArena.All)
+                            from.SendMessage(DuelSystem.MessageHue, ArenaStatusLine(arena));
+
                         break;
                     }
                 case "cancel":
@@ -213,8 +251,11 @@ namespace Server.Engines.Dueling
                 case "stop":
                 case "reset":
                     {
-                        if (RequireStaff(from))
-                            DuelSystem.Reset(from);
+                        DuelArena only;
+
+                        if (RequireStaff(from) && ParseArena(e, 1, out only))
+                            DuelSystem.Reset(from, only);
+
                         break;
                     }
                 case "arena":
@@ -223,15 +264,30 @@ namespace Server.Engines.Dueling
                             return;
 
                         string action = e.Length > 1 ? e.Arguments[1].ToLowerInvariant() : "go";
+                        DuelArena arena;
 
-                        if (action == "build" || action == "rebuild")
+                        if (!ParseArena(e, 2, out arena))
+                            return;
+
+                        if (action == "list")
                         {
-                            int count = DuelArena.Build();
-                            from.SendMessage(DuelSystem.MessageHue, String.Format("[Duel] Arena rebuilt: {0} fence pieces, stone at {1}.", count, DuelArena.StoneLocation));
+                            foreach (DuelArena a in DuelArena.All)
+                                from.SendMessage(DuelSystem.MessageHue, "[Duel] " + a.Describe());
+                        }
+                        else if (action == "build" || action == "rebuild")
+                        {
+                            foreach (DuelArena a in DuelArena.All)
+                            {
+                                if (arena != null && a != arena)
+                                    continue;
+
+                                int count = a.Build();
+                                from.SendMessage(DuelSystem.MessageHue, String.Format("[Duel] Arena {0} rebuilt: {1} fence pieces, stone at {2}.", a.Id, count, a.StoneLocation));
+                            }
                         }
                         else
                         {
-                            from.MoveToWorld(DuelArena.StoneLocation, DuelArena.ArenaMap);
+                            from.MoveToWorld((arena ?? DuelArena.All[0]).StoneLocation, DuelArena.ArenaMap);
                         }
 
                         break;
@@ -242,11 +298,14 @@ namespace Server.Engines.Dueling
             }
         }
 
-        [Usage("DuelReset")]
-        [Description("Aborts the current duel, clears pending challenges and heals everyone in the arena.")]
+        [Usage("DuelReset [arena]")]
+        [Description("Aborts the duel in the given arena (or every arena), clears pending challenges and heals everyone standing there.")]
         private static void DuelReset_OnCommand(CommandEventArgs e)
         {
-            DuelSystem.Reset(e.Mobile);
+            DuelArena only;
+
+            if (ParseArena(e, 0, out only))
+                DuelSystem.Reset(e.Mobile, only);
         }
 
         private static bool RequireStaff(Mobile m)
