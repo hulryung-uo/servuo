@@ -11,7 +11,8 @@ namespace Server.Misc
 
         public static bool SocketBlock { get; set; } = true; // true to block at connection, false to block at login request
 
-        public static int MaxAddresses { get; set; } = 10;
+        // Simultaneous connections allowed from one address; `MaxAddressesPerIP` in Config/Server.cfg.
+        public static int MaxAddresses { get; set; } = Config.Get("Server.MaxAddressesPerIP", 10);
 
         public static IPAddress[] Exemptions { get; set; } = // For hosting services where there are cases where IPs can be proxied
         {
